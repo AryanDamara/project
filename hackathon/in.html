@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Aushadhi-OCR — Single Page</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Tesseract.js v2 (WebAssembly) -->
+  <script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+  <!-- Fuse.js fuzzy search -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
+  <style>
+    :root{
+      --bg:#f6f9fb;
+      --card:#ffffff;
+      --accent:#0f67a1;
+      --muted:#556;
+      --danger:#b33;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+      background:var(--bg);
+      color:#102a43;
+      -webkit-font-smoothing:antialiased;
+    }
+    .wrap{
+      max-width:960px;
+      margin:28px auto;
+      padding:18px;
+    }
+    header { display:flex; align-items:center; gap:16px; margin-bottom:12px; }
+    h1{ margin:0; color:var(--accent); font-size:22px; }
+    .subtitle{ color:var(--muted); font-size:13px; margin-top:6px; }
+    .card{
+      background:var(--card);
+      border-radius:10px;
+      padding:14px;
+      box-shadow:0 6px 20px rgba(8,28,46,0.06);
+      margin-bottom:14px;
+    }
+    .row{ display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+    .col{ flex:1; min-width:260px }
+    .btn{
+      background:var(--accent);
+      color:white;
+      border:none;
+      padding:8px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      margin-top:8px;
+      font-weight:600;
+    }
+    .file-btn{
+      display:inline-block; padding:8px 12px; background:#0b5f88; border-radius:8px; color:white; cursor:pointer;
+    }
+    input[type="file"]{ display:none; }
+    .webcam{ border-radius:8px; overflow:hidden; display:block; width:320px; height:240px; background:#111; }
+    .preview img{ max-width:100%; border-radius:8px; border:1px solid #e6eef6; }
+    .placeholder{
+      height:120px; display:flex; align-items:center; justify-content:center; color:var(--muted);
+      background:#fbfdff; border-radius:8px; border:1px dashed #e2eef8;
+    }
+    .ocr-text{
+      background:#f8fafc; padding:10px; border-radius:8px; min-height:60px; white-space:pre-wrap; font-family:monospace;
+    }
+    .matches{ list-style:none; padding:0; margin:0 }
+    .matches li{
+      display:flex; justify-content:space-between; align-items:center; padding:10px; border-radius:8px; border:1px solid #eef6fb;
+      margin-bottom:8px; background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);
+    }
+    .matches li.best{ box-shadow:0 6px 14px rgba(24,119,189,0.08); border-color:#d7eefc; }
+    .match-name{ font-weight:700 }
+    .match-score{ color:var(--muted) }
+    .hint{ color:var(--muted); font-size:13px; margin-top:6px }
+    .warning{ color:var(--danger); background:#fff1f1; padding:8px; border-radius:8px; border:1px solid #ffd6d6; margin-bottom:10px; }
+    footer{ margin-top:10px; color:var(--muted); font-size:13px }
+    progress{ width:100%; }
+    .small{ font-size:13px; color:var(--muted) }
+    .topbar{ display:flex; align-items:center; gap:8px }
+    .kval{ padding:6px 10px; border-radius:8px; border:1px solid #e3eefb; background:#fff; }
+    .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Aushadhi-OCR (single page)</h1>
+        <div class="subtitle">Upload or capture a medicine pack photo · OCR in browser · fuzzy-match local DB</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div class="small">Demo: in-browser OCR + Fuse.js (no backend)</div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <div class="col">
+          <strong>Upload image</strong>
+          <div style="margin-top:8px;">
+            <label class="file-btn">Choose image<input id="fileInput" type="file" accept="image/*" /></label>
+            <button id="clearBtn" class="btn" style="background:#6b7280;margin-left:8px">Clear</button>
+            <div class="hint">On mobile, choose "Take photo" to open camera. Or use the camera area to capture directly.</div>
+          </div>
+          <hr style="margin:10px 0;">
+          <strong>Camera</strong>
+          <div style="margin-top:8px;">
+            <video id="video" class="webcam" autoplay playsinline></video>
+            <div style="margin-top:8px" class="controls">
+              <button id="captureBtn" class="btn">Capture</button>
+              <button id="startCamBtn" class="btn" style="background:#0b8a44">Start Camera</button>
+              <button id="stopCamBtn" class="btn" style="background:#b33">Stop Camera</button>
+            </div>
+            <div class="hint">Allow camera access when prompted. Use rear camera for labels (choose "environment" if available).</div>
+          </div>
+        </div>
+
+        <div class="col">
+          <strong>Preview</strong>
+          <div id="previewArea" style="margin-top:8px" class="preview placeholder">No image selected</div>
+
+          <div style="margin-top:12px;">
+            <div class="topbar">
+              <div class="small">OCR progress:</div>
+              <progress id="ocrProgress" value="0" max="100" style="flex:1"></progress>
+              <div id="ocrPct" class="small" style="min-width:48px;text-align:right">0%</div>
+            </div>
+            <div style="margin-top:8px;">
+              <button id="runOcrBtn" class="btn">Run OCR</button>
+              <button id="autoOcrBtn" class="btn" style="background:#0b8a44">Auto run on selection</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>OCR result</strong>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small">Top-k</div>
+          <select id="kSelect" class="kval">
+            <option>1</option><option selected>3</option><option>5</option>
+          </select>
+          <div class="small">Threshold</div>
+          <select id="thresholdSelect" class="kval">
+            <option value="0.2">Strict</option>
+            <option value="0.35" selected>Balanced</option>
+            <option value="0.5">Loose</option>
+          </select>
+          <button id="reloadDb" class="btn" style="background:#6b7280">Reload DB</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <pre id="ocrText" class="ocr-text">—</pre>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Matches from medicine DB</strong>
+        <div class="small">Local mock DB (editable inside page)</div>
+      </div>
+
+      <div id="warningContainer" style="margin-top:8px"></div>
+
+      <ul id="matchesList" class="matches" style="margin-top:10px"></ul>
+
+      <div style="margin-top:10px;">
+        <small class="hint">Tip: If OCR misreads, try cropping tighter, improving lighting, or manually editing the text below.</small>
+      </div>
+    </section>
+
+    <section class="card">
+      <strong>Raw / advanced</strong>
+      <div style="margin-top:8px">
+        <textarea id="manualText" placeholder="Edit OCR text before searching..." style="width:100%;height:100px;border-radius:8px;padding:8px"></textarea>
+        <div style="margin-top:8px">
+          <button id="searchManualBtn" class="btn">Search edited text</button>
+          <button id="downloadCsvBtn" class="btn" style="background:#6b7280">Download DB CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <footer style="text-align:center;margin-top:12px">
+      <small>All processing happens in your browser. This is a demo — replace the built-in DB with your verified CSV for production.</small>
+    </footer>
+  </div>
+
+<script>
+/* -------------------------
+   Mock medicine DB (editable)
+   Replace or extend this array with your CSV data.
+   ------------------------- */
+const medicineNames = [
+"Paracetamol 500mg",
+"Paracetamol 650mg",
+"Ibuprofen 200mg",
+"Ibuprofen 400mg",
+"Aspirin 75mg",
+"Aspirin 325mg",
+"Amoxicillin 250mg",
+"Amoxicillin 500mg",
+"Azithromycin 500mg",
+"Ciprofloxacin 500mg",
+"Levofloxacin 500mg",
+"Moxifloxacin 400mg",
+"Cefalexin 500mg",
+"Cefuroxime 500mg",
+"Cefixime 400mg",
+"Doxycycline 100mg",
+"Minocycline 100mg",
+"Metronidazole 400mg",
+"Fluconazole 150mg",
+"Ketoconazole 200mg",
+"Clotrimazole 1% cream",
+"Omeprazole 20mg",
+"Omeprazole 40mg",
+"Pantoprazole 40mg",
+"Lansoprazole 30mg",
+"Rabeprazole 20mg",
+"Atorvastatin 10mg",
+"Atorvastatin 20mg",
+"Simvastatin 20mg",
+"Rosuvastatin 10mg",
+"Metformin 500mg",
+"Metformin 850mg",
+"Glibenclamide 5mg",
+"Glimepiride 2mg",
+"Sitagliptin 100mg",
+"Empagliflozin 10mg",
+"Lisinopril 10mg",
+"Amlodipine 5mg",
+"Amlodipine 10mg",
+"Losartan 50mg",
+"Telmisartan 40mg",
+"Hydrochlorothiazide 25mg",
+"Spironolactone 25mg",
+"Furosemide 40mg",
+"Metoprolol 50mg",
+"Atenolol 50mg",
+"Carvedilol 12.5mg",
+"Clopidogrel 75mg",
+"Warfarin 5mg",
+"Digoxin 0.25mg",
+"Salbutamol inhaler 100mcg",
+"Ipratropium inhaler",
+"Budesonide inhaler 200mcg",
+"Montelukast 10mg",
+"Cetirizine 10mg",
+"Levocetirizine 5mg",
+"Loratadine 10mg",
+"Prednisone 5mg",
+"Hydrocortisone cream 1%",
+"Insulin glargine 100IU/ml",
+"Insulin aspart 100IU/ml",
+"Dulaglutide 0.75mg",
+"Semaglutide 0.5mg",
+"Omnicef (Cefdinir) 300mg",
+"Tramadol 50mg",
+"Codeine 30mg",
+"Morphine Sulfate 10mg",
+"Diazepam 5mg",
+"Alprazolam 0.5mg",
+"Lorazepam 1mg",
+"Zolpidem 10mg",
+"Sertraline 50mg",
+"Fluoxetine 20mg",
+"Escitalopram 10mg",
+"Duloxetine 60mg",
+"Paroxetine 20mg",
+"Ranitidine 150mg",
+"Domperidone 10mg",
+"Ondansetron 4mg",
+"Promethazine 25mg",
+"Amantadine 100mg",
+"Azathioprine 50mg",
+"Nevirapine 200mg",
+"Lamivudine 150mg",
+"Tenofovir 300mg",
+"Abacavir 300mg",
+"Rifampicin 450mg",
+"Isoniazid 300mg",
+"Pyrazinamide 750mg",
+"Ethambutol 800mg",
+"Vitamin B12 1000mcg",
+"Folic Acid 5mg",
+"Calcium Carbonate 500mg",
+"Vitamin D3 1000IU",
+"Multivitamin tablet",
+"Hydroxychloroquine 200mg",
+"Chloroquine 250mg",
+"Gabapentin 300mg",
+"Pregabalin 75mg",
+"Topiramate 25mg",
+"Levetiracetam 500mg",
+"Carbamazepine 200mg",
+"Phenytoin 100mg",
+"Propranolol 40mg",
+"Bosentan 62.5mg",
+"Sildenafil 50mg",
+"Tadalafil 20mg",
+"Allopurinol 100mg",
+"Rivaroxaban 20mg",
+"Apixaban 5mg",
+"Benzathine penicillin 1.2m IU",
+"Clindamycin 300mg",
+"Naproxen 500mg",
+"Diclofenac 50mg",
+"Betahistine 16mg",
+"Levothyroxine 50mcg",
+"Finasteride 5mg",
+"Metformin XR 500mg"
+]; // ~120 items (mock). Replace with your CSV data if needed.
+
+/* -------------------------
+   Setup Fuse.js fuzzy index
+   ------------------------- */
+let fuse = null;
+function initFuse() {
+  // Fuse options tuned for medicine name searches
+  const options = {
+    includeScore: true,
+    shouldSort: true,
+    threshold: 0.35, // default; adjustable from UI
+    location: 0,
+    distance: 100,
+    maxPatternLength: 64,
+    minMatchCharLength: 2,
+    keys: [] // since array of strings, treat items directly
+  };
+  fuse = new Fuse(medicineNames, options);
+}
+initFuse();
+
+/* -------------------------
+   UI elements
+   ------------------------- */
+const fileInput = document.getElementById('fileInput');
+const previewArea = document.getElementById('previewArea');
+const video = document.getElementById('video');
+const captureBtn = document.getElementById('captureBtn');
+const startCamBtn = document.getElementById('startCamBtn');
+const stopCamBtn = document.getElementById('stopCamBtn');
+const runOcrBtn = document.getElementById('runOcrBtn');
+const autoOcrBtn = document.getElementById('autoOcrBtn');
+const ocrProgress = document.getElementById('ocrProgress');
+const ocrPct = document.getElementById('ocrPct');
+const ocrTextEl = document.getElementById('ocrText');
+const matchesList = document.getElementById('matchesList');
+const warningContainer = document.getElementById('warningContainer');
+const manualText = document.getElementById('manualText');
+const searchManualBtn = document.getElementById('searchManualBtn');
+const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+const kSelect = document.getElementById('kSelect');
+const thresholdSelect = document.getElementById('thresholdSelect');
+const reloadDb = document.getElementById('reloadDb');
+const clearBtn = document.getElementById('clearBtn');
+
+let currentDataUrl = null;
+let autoOcrEnabled = false;
+let tesseractWorker = null;
+let streamRef = null;
+
+/* -------------------------
+   Camera controls
+   ------------------------- */
+async function startCamera() {
+  if (streamRef) return;
+  try {
+    const constraints = { video: { facingMode: { ideal: "environment" } }, audio: false };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    streamRef = stream;
+    video.srcObject = stream;
+    video.play();
+  } catch (err) {
+    alert('Could not open camera: ' + err.message);
+  }
+}
+function stopCamera() {
+  if (!streamRef) return;
+  streamRef.getTracks().forEach(t => t.stop());
+  streamRef = null;
+  video.pause();
+  video.srcObject = null;
+}
+startCamBtn.addEventListener('click', startCamera);
+stopCamBtn.addEventListener('click', stopCamera);
+
+/* -------------------------
+   Capture & Preview helpers
+   ------------------------- */
+function setPreviewImage(dataUrl) {
+  previewArea.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.alt = 'preview';
+  previewArea.appendChild(img);
+  currentDataUrl = dataUrl;
+  if (autoOcrEnabled) runFullOcrAndSearch();
+}
+captureBtn.addEventListener('click', () => {
+  if (!video || !streamRef) {
+    alert('Start camera first.');
+    return;
+  }
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  // draw video frame
+  ctx.drawImage(video, 0, 0, w, h);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  setPreviewImage(dataUrl);
+});
+
+/* File upload */
+fileInput.addEventListener('change', (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    setPreviewImage(reader.result);
+    if (autoOcrEnabled) runFullOcrAndSearch();
+  };
+  reader.readAsDataURL(f);
+});
+
+/* Clear */
+clearBtn.addEventListener('click', () => {
+  currentDataUrl = null;
+  previewArea.innerHTML = '<div class="placeholder">No image selected</div>';
+  ocrTextEl.textContent = '—';
+  manualText.value = '';
+  matchesList.innerHTML = '';
+  warningContainer.innerHTML = '';
+});
+
+/* -------------------------
+   Tesseract worker init
+   ------------------------- */
+async function ensureWorker() {
+  if (tesseractWorker) return tesseractWorker;
+  if (!window.Tesseract) {
+    alert('Tesseract.js not loaded. Check your connection to CDN.');
+    throw new Error('Tesseract not loaded');
+  }
+  tesseractWorker = Tesseract.createWorker({
+    logger: m => {
+      // m: { status, progress }
+      if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+        const p = Math.round(m.progress * 100);
+        ocrProgress.value = p;
+        ocrPct.textContent = p + '%';
+      } else if (m.status) {
+        // some other status; can be displayed if desired
+      }
+    }
+  });
+  await tesseractWorker.load();
+  await tesseractWorker.loadLanguage('eng');
+  await tesseractWorker.initialize('eng');
+  return tesseractWorker;
+}
+
+/* -------------------------
+   OCR + Fuse search flow
+   ------------------------- */
+async function runOcrOnCurrent() {
+  if (!currentDataUrl) {
+    alert('No image selected.');
+    return '';
+  }
+  try {
+    await ensureWorker();
+    ocrProgress.value = 0;
+    ocrPct.textContent = '0%';
+    ocrTextEl.textContent = 'Running OCR...';
+    const res = await tesseractWorker.recognize(currentDataUrl);
+    const text = (res && res.data && res.data.text) ? res.data.text.trim() : '';
+    ocrTextEl.textContent = text || '—';
+    manualText.value = text;
+    return text;
+  } catch (err) {
+    console.error('OCR error', err);
+    ocrTextEl.textContent = 'OCR error: ' + (err.message || err);
+    return '';
+  }
+}
+
+function scoreToPercent(score) {
+  if (typeof score !== 'number') return '—';
+  const p = Math.max(0, Math.min(100, Math.round((1 - score) * 100)));
+  return p + '%';
+}
+
+function showMatches(results, k, threshold) {
+  matchesList.innerHTML = '';
+  warningContainer.innerHTML = '';
+  if (!results || !results.length) {
+    warningContainer.innerHTML = '<div class="warning">No matches found.</div>';
+    return;
+  }
+  // results are Fuse results with .item and .score
+  const filtered = results.slice(0, k).filter(r => (r.score <= threshold));
+  if (!filtered.length) {
+    // optionally show top result but warn
+    const top = results[0];
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="match-name">${escapeHtml(top.item)}</div><div class="match-score">Top: ${scoreToPercent(top.score)} (below threshold)</div>`;
+    matchesList.appendChild(li);
+    warningContainer.innerHTML = '<div class="warning">Top match below confidence threshold — possible mismatch or OCR error.</div>';
+    return;
+  }
+  filtered.forEach((r, idx) => {
+    const li = document.createElement('li');
+    if (idx === 0) li.classList.add('best');
+    li.innerHTML = `<div class="match-name">${escapeHtml(r.item)}</div><div class="match-score">Confidence: ${scoreToPercent(r.score)}</div>`;
+    matchesList.appendChild(li);
+  });
+}
+
+/* sanitize */
+function escapeHtml(s) {
+  return (s+'').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* run full flow: OCR then search */
+async function runFullOcrAndSearch() {
+  const text = await runOcrOnCurrent();
+  if (!text) return;
+  // perform fuzzy search
+  const K = parseInt(kSelect.value, 10) || 3;
+  const threshold = parseFloat(thresholdSelect.value) || 0.35;
+  // update Fuse threshold on the fly
+  if (fuse) fuse.options.threshold = parseFloat(thresholdSelect.value);
+  const results = fuse.search(text, { limit: 20 });
+  showMatches(results, K, threshold);
+}
+
+/* -------------------------
+   Buttons bindings
+   ------------------------- */
+runOcrBtn.addEventListener('click', runFullOcrAndSearch);
+autoOcrBtn.addEventListener('click', () => {
+  autoOcrEnabled = !autoOcrEnabled;
+  autoOcrBtn.textContent = autoOcrEnabled ? 'Auto run on selection: ON' : 'Auto run on selection';
+  autoOcrBtn.style.background = autoOcrEnabled ? '#0b8a44' : '#0f67a1';
+});
+
+searchManualBtn.addEventListener('click', () => {
+  const text = manualText.value.trim();
+  if (!text) {
+    alert('Edit or paste text first.');
+    return;
+  }
+  const results = fuse.search(text, { limit: 20 });
+  showMatches(results, parseInt(kSelect.value,10), parseFloat(thresholdSelect.value));
+});
+
+downloadCsvBtn.addEventListener('click', () => {
+  const header = 'name\n';
+  const csv = header + medicineNames.map(n => `"${n.replace(/"/g,'""')}"`).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'medicines.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+/* reload DB (rebuild fuse) */
+reloadDb.addEventListener('click', () => {
+  // if you allowed editing the array programmatically, re-init fuse
+  initFuse();
+  alert('Local DB reloaded into search index.');
+});
+
+/* manual: adjust threshold select updates fuse threshold live */
+thresholdSelect.addEventListener('change', (e) => {
+  if (fuse) fuse.options.threshold = parseFloat(e.target.value);
+});
+
+/* optional: populate manual textarea with OCR text when OCR finishes
+   implemented inside runOcrOnCurrent by setting manualText.value = text */
+
+/* utility: escape enter to run quick search in manualText */
+manualText.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    searchManualBtn.click();
+  }
+});
+
+/* initialize default UI */
+(function initUI() {
+  ocrProgress.value = 0;
+  ocrPct.textContent = '0%';
+  ocrTextEl.textContent = '—';
+  manualText.value = '';
+  matchesList.innerHTML = '';
+})();
+
+/* small helper to auto-run OCR/search when user selects an image (if autoOcrEnabled is true) - handled in setPreviewImage */
+
+/* warn before unload if camera open */
+window.addEventListener('beforeunload', () => {
+  if (streamRef) stopCamera();
+});
+</script>
+</body>
+</html>

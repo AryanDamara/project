@@ -1,0 +1,104 @@
+/* style.css */
+:root{
+  --black:#111;
+  --dark:#0f0f0f;
+  --light:#efefef;
+  --accent:#222;
+  --muted:#9b9b9b;
+  --container:1100px;
+  --radius:6px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:linear-gradient(#f3f3f3,#e9e9e9);
+  color:var(--black);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.wrap{max-width:var(--container);margin:24px auto;padding:0 16px}
+
+/* NAV */
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  background:#fff;
+  border-radius:8px;
+  box-shadow:0 6px 18px rgba(0,0,0,.04);
+}
+.brand{font-weight:700;letter-spacing:1px}
+nav a{margin-left:18px;text-decoration:none;color:var(--dark);font-weight:600;font-size:14px}
+.cta{border:2px solid var(--dark);padding:8px 12px;border-radius:20px;background:transparent;cursor:pointer}
+
+/* HERO */
+.hero{display:grid;grid-template-columns:1fr 420px;gap:0;margin-top:18px;align-items:stretch}
+.hero .left{background:#dcdcdc;padding:48px 40px;position:relative;border-radius:8px 0 0 8px}
+.hero .right{background:linear-gradient(180deg,#0b0b0b,#000);color:#fff;padding:36px;border-radius:0 8px 8px 0;display:flex;align-items:center;justify-content:center;position:relative}
+
+.intro small{display:block;color:var(--muted);margin-bottom:8px;font-weight:600}
+h1{margin:0;font-size:34px;line-height:1}
+.role{color:var(--muted);margin-top:6px;font-size:15px}
+
+.social{margin-top:18px}
+.social a{display:inline-block;margin-right:10px;width:36px;height:36px;border-radius:6px;background:#222;color:#fff;text-align:center;line-height:36px;text-decoration:none;font-weight:700}
+
+.hero .right img{max-width:320px;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.6);display:block}
+.hero .right .badge{position:absolute;right:36px;top:20px;background:#fff;color:#000;padding:6px 10px;border-radius:20px;font-weight:700}
+
+/* ribbon */
+.ribbon{margin-top:18px;background:#111;color:#fff;padding:22px;border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+.ribbon p{margin:0;max-width:900px;color:#ddd;font-size:14px}
+
+/* About */
+section{margin-top:36px;background:transparent}
+.card{background:transparent;padding:48px;border-radius:8px;text-align:center}
+.card h2{display:inline-block;padding:12px 28px;border:2px solid #111;border-radius:4px;background:#fff;font-size:18px}
+.about-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:32px;text-align:left}
+.about-item{background:#fff;padding:20px;border-radius:8px;box-shadow:0 8px 20px rgba(17,17,17,0.03)}
+.about-item h3{margin-top:0}
+.muted{color:var(--muted);font-size:14px}
+
+/* Skills */
+.skills{margin-top:36px;text-align:center}
+.skills h2{margin:0}
+.skills .list{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-top:18px}
+.skill{width:80px;height:80px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.06);font-weight:700}
+
+/* Portfolio */
+.portfolio{margin-top:40px}
+.portfolio h2{margin-bottom:18px}
+.portfolio-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.portfolio-grid img{width:100%;height:180px;object-fit:cover;border-radius:6px;display:block;box-shadow:0 8px 18px rgba(0,0,0,.06)}
+
+/* Contact */
+.contact{margin-top:40px;padding:40px;background:#fff;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.04)}
+.contact h2{margin-top:0}
+.contact form{max-width:700px;margin:0 auto;display:grid;gap:14px}
+.contact input,.contact textarea{padding:12px;border:1px solid #ccc;border-radius:4px;font-size:15px;outline:none}
+.contact input:focus,.contact textarea:focus{box-shadow:0 6px 18px rgba(0,0,0,.06);border-color:#aaa}
+.contact button{padding:12px;border:2px solid var(--black);background:transparent;border-radius:4px;font-weight:700;cursor:pointer}
+
+/* Footer */
+footer{margin-top:28px;padding:18px;background:#111;color:#fff;border-radius:8px;text-align:center;font-size:14px}
+
+/* Responsive */
+@media (max-width:960px){
+  .hero{grid-template-columns:1fr;}
+  .hero .left{border-radius:8px 8px 0 0}
+  .hero .right{border-radius:0 0 8px 8px;padding:24px}
+  .about-grid{grid-template-columns:1fr}
+  .portfolio-grid{grid-template-columns:repeat(2,1fr)}
+  header{padding:12px}
+}
+
+@media (max-width:480px){
+  nav a{display:none}
+  .hero .right img{max-width:220px}
+  .portfolio-grid{grid-template-columns:1fr}
+  .wrap{margin:12px auto;padding:0 12px}
+}
